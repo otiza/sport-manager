@@ -1,10 +1,29 @@
 import os
 import random
 import sqlite3
+import shutil
 from typing import Iterable, Optional
 
 INJURY_CHANCE = 0.5
-DIVIDER = "-" * 50
+DEFAULT_WIDTH = 70
+
+
+def get_terminal_width() -> int:
+    return shutil.get_terminal_size((DEFAULT_WIDTH, 20)).columns
+
+
+def center_text(text: str, width: Optional[int] = None) -> str:
+    return text.center(width or get_terminal_width())
+
+
+def print_logo(width: Optional[int] = None) -> None:
+    width = width or get_terminal_width()
+    logo = [
+        "⚽🏟️  SPORT MANAGER  🏟️⚽",
+        "★☆★  Vivez le match au centre du terrain  ★☆★",
+    ]
+    for line in logo:
+        print(center_text(line, width))
 
 
 def clear_screen() -> None:
@@ -17,9 +36,19 @@ def pause() -> None:
 
 def header(title: str) -> None:
     clear_screen()
-    print(DIVIDER)
-    print(title)
-    print(DIVIDER)
+    width = get_terminal_width()
+    divider = "═" * width
+    print(divider)
+    print_logo(width)
+    print(center_text(title.upper(), width))
+    print(divider)
+
+
+def section_banner(title: str, icon: str) -> None:
+    width = get_terminal_width()
+    banner = f"{icon}  {title}  {icon}"
+    print(center_text(banner, width))
+    print(center_text("·" * len(banner), width))
 
 
 def ask_int(prompt: str, minimum: Optional[int] = None, maximum: Optional[int] = None) -> int:
@@ -70,6 +99,7 @@ def create_team(conn: sqlite3.Connection) -> None:
 
 def list_teams(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     header("Liste des équipes")
+    section_banner("ÉQUIPES", "🏆")
     teams = list_rows(conn, "SELECT id, name FROM teams ORDER BY name")
     if not teams:
         print("Aucune équipe.")
@@ -137,6 +167,7 @@ def create_position(conn: sqlite3.Connection) -> None:
 
 def list_positions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     header("Liste des postes")
+    section_banner("POSTES", "🧭")
     rows = list_rows(
         conn,
         """
@@ -237,6 +268,7 @@ def create_player(conn: sqlite3.Connection) -> None:
 
 def list_players(conn: sqlite3.Connection, team_id: Optional[int] = None) -> list[sqlite3.Row]:
     header("Liste des joueurs")
+    section_banner("JOUEURS", "👟")
     query = (
         """
         SELECT players.id, players.name, teams.name AS team_name, players.speed, players.endurance,
@@ -336,6 +368,7 @@ def decrement_injuries(conn: sqlite3.Connection) -> None:
 
 def play_match(conn: sqlite3.Connection) -> None:
     header("Jouer un match")
+    section_banner("CENTRE DU MATCH", "🎯")
     teams = list_teams(conn)
     if len(teams) < 2:
         print("Il faut au moins deux équipes.")
@@ -407,6 +440,7 @@ def play_match(conn: sqlite3.Connection) -> None:
 
 def list_matches(conn: sqlite3.Connection) -> None:
     header("Historique des matchs")
+    section_banner("MATCHS", "📊")
     rows = list_rows(
         conn,
         """
