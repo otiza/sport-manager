@@ -1,84 +1,11 @@
-import os
 import random
 import sqlite3
-import shutil
-from typing import Iterable, Optional
+from typing import Optional
+
+import db_queries
+from display import ask_int, choose_from_list, header, pause, section_banner
 
 INJURY_CHANCE = 0.5
-DEFAULT_WIDTH = 70
-
-
-def get_terminal_width() -> int:
-    return shutil.get_terminal_size((DEFAULT_WIDTH, 20)).columns
-
-
-def center_text(text: str, width: Optional[int] = None) -> str:
-    return text.center(width or get_terminal_width())
-
-
-def print_logo(width: Optional[int] = None) -> None:
-    width = width or get_terminal_width()
-    logo = [
-        "⚽🏟️  SPORT MANAGER  🏟️⚽",
-        "★☆★  Vivez le match au centre du terrain  ★☆★",
-    ]
-    for line in logo:
-        print(center_text(line, width))
-
-
-def clear_screen() -> None:
-    os.system("cls" if os.name == "nt" else "clear")
-
-
-def pause() -> None:
-    input("\nAppuyez sur Entrée pour continuer...")
-
-
-def header(title: str) -> None:
-    clear_screen()
-    width = get_terminal_width()
-    divider = "═" * width
-    print(divider)
-    print_logo(width)
-    print(center_text(title.upper(), width))
-    print(divider)
-
-
-def section_banner(title: str, icon: str) -> None:
-    width = get_terminal_width()
-    banner = f"{icon}  {title}  {icon}"
-    print(center_text(banner, width))
-    print(center_text("·" * len(banner), width))
-
-
-def ask_int(prompt: str, minimum: Optional[int] = None, maximum: Optional[int] = None) -> int:
-    while True:
-        value = input(prompt).strip()
-        if not value.isdigit():
-            print("Veuillez saisir un nombre.")
-            continue
-        number = int(value)
-        if minimum is not None and number < minimum:
-            print(f"Valeur minimale: {minimum}.")
-            continue
-        if maximum is not None and number > maximum:
-            print(f"Valeur maximale: {maximum}.")
-            continue
-        return number
-
-
-def list_rows(conn: sqlite3.Connection, query: str, params: tuple = ()) -> list[sqlite3.Row]:
-    return conn.execute(query, params).fetchall()
-
-
-def choose_from_list(rows: list[sqlite3.Row], title: str) -> Optional[int]:
-    if not rows:
-        print(f"Aucun élément pour {title}.")
-        return None
-    print(f"\n{title}:")
-    for row in rows:
-        print(f"[{row['id']}] {row['name']}")
-    return ask_int("Choisissez un ID: ")
 
 
 def create_team(conn: sqlite3.Connection) -> None:
@@ -89,8 +16,7 @@ def create_team(conn: sqlite3.Connection) -> None:
         pause()
         return
     try:
-        conn.execute("INSERT INTO teams (name) VALUES (?)", (name,))
-        conn.commit()
+        db_queries.insert_team(conn, name)
         print("Équipe créée.")
     except sqlite3.IntegrityError:
         print("Nom déjà utilisé.")
@@ -100,7 +26,7 @@ def create_team(conn: sqlite3.Connection) -> None:
 def list_teams(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     header("Liste des équipes")
     section_banner("ÉQUIPES", "🏆")
-    teams = list_rows(conn, "SELECT id, name FROM teams ORDER BY name")
+    teams = db_queries.get_teams(conn)
     if not teams:
         print("Aucune équipe.")
     else:
@@ -121,8 +47,7 @@ def update_team(conn: sqlite3.Connection) -> None:
         print("Nom obligatoire.")
         pause()
         return
-    conn.execute("UPDATE teams SET name = ? WHERE id = ?", (name, team_id))
-    conn.commit()
+    db_queries.update_team(conn, team_id, name)
     print("Équipe mise à jour.")
     pause()
 
@@ -133,8 +58,7 @@ def delete_team(conn: sqlite3.Connection) -> None:
     team_id = choose_from_list(teams, "Supprimer une équipe")
     if not team_id:
         return
-    conn.execute("DELETE FROM teams WHERE id = ?", (team_id,))
-    conn.commit()
+    db_queries.delete_team(conn, team_id)
     print("Équipe supprimée.")
     pause()
 
@@ -151,14 +75,7 @@ def create_position(conn: sqlite3.Connection) -> None:
     min_force = ask_int("Min force (0-100): ", 0, 100)
     min_technique = ask_int("Min technique (0-100): ", 0, 100)
     try:
-        conn.execute(
-            """
-            INSERT INTO positions (name, min_vitesse, min_endurance, min_force, min_technique)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (name, min_vitesse, min_endurance, min_force, min_technique),
-        )
-        conn.commit()
+        db_queries.insert_position(conn, name, min_vitesse, min_endurance, min_force, min_technique)
         print("Poste créé.")
     except sqlite3.IntegrityError:
         print("Nom déjà utilisé.")
@@ -168,13 +85,7 @@ def create_position(conn: sqlite3.Connection) -> None:
 def list_positions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     header("Liste des postes")
     section_banner("POSTES", "🧭")
-    rows = list_rows(
-        conn,
-        """
-        SELECT id, name, min_vitesse, min_endurance, min_force, min_technique
-        FROM positions ORDER BY name
-        """,
-    )
+    rows = db_queries.get_positions(conn)
     if not rows:
         print("Aucun poste.")
     else:
@@ -202,15 +113,15 @@ def update_position(conn: sqlite3.Connection) -> None:
     min_endurance = ask_int("Min endurance (0-100): ", 0, 100)
     min_force = ask_int("Min force (0-100): ", 0, 100)
     min_technique = ask_int("Min technique (0-100): ", 0, 100)
-    conn.execute(
-        """
-        UPDATE positions
-        SET name = ?, min_vitesse = ?, min_endurance = ?, min_force = ?, min_technique = ?
-        WHERE id = ?
-        """,
-        (name, min_vitesse, min_endurance, min_force, min_technique, pos_id),
+    db_queries.update_position(
+        conn,
+        pos_id,
+        name,
+        min_vitesse,
+        min_endurance,
+        min_force,
+        min_technique,
     )
-    conn.commit()
     print("Poste mis à jour.")
     pause()
 
@@ -221,8 +132,7 @@ def delete_position(conn: sqlite3.Connection) -> None:
     pos_id = choose_from_list(rows, "Supprimer un poste")
     if not pos_id:
         return
-    conn.execute("DELETE FROM positions WHERE id = ?", (pos_id,))
-    conn.commit()
+    db_queries.delete_position(conn, pos_id)
     print("Poste supprimé.")
     pause()
 
@@ -249,19 +159,27 @@ def create_player(conn: sqlite3.Connection) -> None:
         if assign == "o":
             pos_id = choose_from_list(positions, "Choisir un poste")
             if pos_id:
-                pos = conn.execute("SELECT * FROM positions WHERE id = ?", (pos_id,)).fetchone()
-                if pos and speed >= pos["min_vitesse"] and endurance >= pos["min_endurance"] and force >= pos["min_force"] and technique >= pos["min_technique"]:
+                pos = db_queries.get_position(conn, pos_id)
+                if (
+                    pos
+                    and speed >= pos["min_vitesse"]
+                    and endurance >= pos["min_endurance"]
+                    and force >= pos["min_force"]
+                    and technique >= pos["min_technique"]
+                ):
                     position_id = pos_id
                 else:
                     print("Compétences insuffisantes pour ce poste.")
-    conn.execute(
-        """
-        INSERT INTO players (team_id, name, speed, endurance, force, technique, position_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (team_id, name, speed, endurance, force, technique, position_id),
+    db_queries.insert_player(
+        conn,
+        team_id,
+        name,
+        speed,
+        endurance,
+        force,
+        technique,
+        position_id,
     )
-    conn.commit()
     print("Joueur créé.")
     pause()
 
@@ -269,22 +187,7 @@ def create_player(conn: sqlite3.Connection) -> None:
 def list_players(conn: sqlite3.Connection, team_id: Optional[int] = None) -> list[sqlite3.Row]:
     header("Liste des joueurs")
     section_banner("JOUEURS", "👟")
-    query = (
-        """
-        SELECT players.id, players.name, teams.name AS team_name, players.speed, players.endurance,
-               players.force, players.technique, players.match_blessure_restants,
-               positions.name AS position_name
-        FROM players
-        JOIN teams ON teams.id = players.team_id
-        LEFT JOIN positions ON positions.id = players.position_id
-        """
-    )
-    params: tuple = ()
-    if team_id:
-        query += " WHERE players.team_id = ?"
-        params = (team_id,)
-    query += " ORDER BY teams.name, players.name"
-    rows = list_rows(conn, query, params)
+    rows = db_queries.get_players(conn, team_id)
     if not rows:
         print("Aucun joueur.")
     else:
@@ -306,7 +209,7 @@ def update_player(conn: sqlite3.Connection) -> None:
     player_id = choose_from_list(rows, "Modifier un joueur")
     if not player_id:
         return
-    player = conn.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+    player = db_queries.get_player(conn, player_id)
     if not player:
         print("Joueur introuvable.")
         pause()
@@ -323,20 +226,27 @@ def update_player(conn: sqlite3.Connection) -> None:
         if assign == "o":
             pos_id = choose_from_list(positions, "Choisir un poste")
             if pos_id:
-                pos = conn.execute("SELECT * FROM positions WHERE id = ?", (pos_id,)).fetchone()
-                if pos and speed >= pos["min_vitesse"] and endurance >= pos["min_endurance"] and force >= pos["min_force"] and technique >= pos["min_technique"]:
+                pos = db_queries.get_position(conn, pos_id)
+                if (
+                    pos
+                    and speed >= pos["min_vitesse"]
+                    and endurance >= pos["min_endurance"]
+                    and force >= pos["min_force"]
+                    and technique >= pos["min_technique"]
+                ):
                     position_id = pos_id
                 else:
                     print("Compétences insuffisantes pour ce poste.")
-    conn.execute(
-        """
-        UPDATE players
-        SET name = ?, speed = ?, endurance = ?, force = ?, technique = ?, position_id = ?
-        WHERE id = ?
-        """,
-        (name, speed, endurance, force, technique, position_id, player_id),
+    db_queries.update_player(
+        conn,
+        player_id,
+        name,
+        speed,
+        endurance,
+        force,
+        technique,
+        position_id,
     )
-    conn.commit()
     print("Joueur mis à jour.")
     pause()
 
@@ -347,23 +257,9 @@ def delete_player(conn: sqlite3.Connection) -> None:
     player_id = choose_from_list(rows, "Supprimer un joueur")
     if not player_id:
         return
-    conn.execute("DELETE FROM players WHERE id = ?", (player_id,))
-    conn.commit()
+    db_queries.delete_player(conn, player_id)
     print("Joueur supprimé.")
     pause()
-
-
-def decrement_injuries(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """
-        UPDATE players
-        SET match_blessure_restants = CASE
-            WHEN match_blessure_restants > 0 THEN match_blessure_restants - 1
-            ELSE 0
-        END
-        """
-    )
-    conn.commit()
 
 
 def play_match(conn: sqlite3.Connection) -> None:
@@ -385,21 +281,9 @@ def play_match(conn: sqlite3.Connection) -> None:
     score1 = ask_int("Score équipe 1: ", 0)
     score2 = ask_int("Score équipe 2: ", 0)
 
-    conn.execute(
-        "INSERT INTO matches (team1_id, team2_id, score1, score2) VALUES (?, ?, ?, ?)",
-        (team1_id, team2_id, score1, score2),
-    )
-    match_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    match_id = db_queries.insert_match(conn, team1_id, team2_id, score1, score2)
 
-    players = list_rows(
-        conn,
-        """
-        SELECT * FROM players
-        WHERE team_id IN (?, ?)
-        ORDER BY team_id, name
-        """,
-        (team1_id, team2_id),
-    )
+    players = db_queries.get_players_for_match(conn, team1_id, team2_id)
     if not players:
         print("Aucun joueur pour ce match.")
         pause()
@@ -419,21 +303,12 @@ def play_match(conn: sqlite3.Connection) -> None:
         injured = 1 if random.random() < INJURY_CHANCE else 0
         if injured:
             restants = random.randint(1, 3)
-            conn.execute(
-                "UPDATE players SET match_blessure_restants = ? WHERE id = ?",
-                (restants, player["id"]),
-            )
+            db_queries.update_player_injury(conn, player["id"], restants)
             print(f"{player['name']} s'est blessé pour {restants} match(s).")
-        conn.execute(
-            """
-            INSERT INTO match_players (match_id, player_id, performance, injured)
-            VALUES (?, ?, ?, ?)
-            """,
-            (match_id, player["id"], performance, injured),
-        )
+        db_queries.insert_match_player(conn, match_id, player["id"], performance, injured)
 
     conn.commit()
-    decrement_injuries(conn)
+    db_queries.decrement_injuries(conn)
     print("Match enregistré.")
     pause()
 
@@ -441,17 +316,7 @@ def play_match(conn: sqlite3.Connection) -> None:
 def list_matches(conn: sqlite3.Connection) -> None:
     header("Historique des matchs")
     section_banner("MATCHS", "📊")
-    rows = list_rows(
-        conn,
-        """
-        SELECT matches.id, t1.name AS team1, t2.name AS team2,
-               matches.score1, matches.score2, matches.played_at
-        FROM matches
-        JOIN teams t1 ON t1.id = matches.team1_id
-        JOIN teams t2 ON t2.id = matches.team2_id
-        ORDER BY matches.played_at DESC
-        """,
-    )
+    rows = db_queries.get_matches(conn)
     if not rows:
         print("Aucun match.")
         pause()
