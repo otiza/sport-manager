@@ -62,6 +62,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE
         );
         """
+
     )
     conn.commit()
 
