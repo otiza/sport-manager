@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from operations import (
-    DIVIDER,
-    clear_screen,
+from display import header
+from logic import (
     create_player,
     create_position,
     create_team,
@@ -43,10 +42,7 @@ def main_menu() -> None:
         "0": ("Quitter", None),
     }
     while True:
-        clear_screen()
-        print(DIVIDER)
-        print("Sport Manager CLI")
-        print(DIVIDER)
+        header("Sport Manager CLI")
         for key, (label, _) in menu.items():
             print(f"{key}. {label}")
         choice = input("Choix: ").strip()

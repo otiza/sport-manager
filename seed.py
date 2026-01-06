@@ -1,7 +1,7 @@
 import random
 import sqlite3
 
-from operations import header, pause
+from display import header, pause
 from schema import connect_db
 
 
